@@ -22,9 +22,14 @@ class MazeEnv:
                2: ( 0, -1),  # left
                3: ( 0,  1)}  # right
 
-    def __init__(self, maze: np.ndarray, start: tuple, goal: tuple,
-                 max_steps: int = 200, step_reward: float = -1.0,
-                 goal_reward: float = 0.0):
+    def __init__(
+        self,
+        maze: np.ndarray,
+        start: tuple, goal: tuple,
+        max_steps: int = 200,
+        step_reward: float = -1.0,
+        goal_reward: float = 0.0
+    ):
         self.maze = maze.copy()
         self.H, self.W = maze.shape
         self.start = start
