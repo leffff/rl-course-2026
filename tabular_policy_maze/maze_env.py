@@ -17,10 +17,12 @@ class MazeEnv:
         Bonus reward for reaching the goal.
     """
 
-    ACTIONS = {0: (-1, 0),   # up
-               1: ( 1, 0),   # down
-               2: ( 0, -1),  # left
-               3: ( 0,  1)}  # right
+    ACTIONS = {
+        0: (-1, 0),   # up
+        1: ( 1, 0),   # down
+        2: ( 0, -1),  # left
+        3: ( 0,  1)   # right
+    }
 
     def __init__(
         self,

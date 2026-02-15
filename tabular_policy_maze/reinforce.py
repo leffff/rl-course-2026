@@ -89,6 +89,7 @@ def plot_maze_with_trajectory(env, theta, title="Trajectory"):
 
 def plot_steps_distribution(env, theta, n_trajectories=500, figsize=(10, 5)):
     steps_success, steps_fail = [], []
+    
     for _ in tqdm(range(n_trajectories), desc="Sampling trajectories"):
         s = env.reset()
         done, t = False, 0
@@ -113,11 +114,12 @@ def plot_steps_distribution(env, theta, n_trajectories=500, figsize=(10, 5)):
         ax.hist(steps_fail, bins=bins, edgecolor="black", alpha=0.7,
                 color="salmon", label=f"truncated ({len(steps_fail)})")
 
-    ax.axvline(np.mean(all_steps), color="red", linestyle="--",
-               label=f"mean={np.mean(all_steps):.1f}")
+    ax.axvline(np.mean(all_steps), color="red", linestyle="--", label=f"$\mu$={np.mean(all_steps):.1f}, $\sigma$={np.std(all_steps):.1f}")
     ax.set_xlabel("Steps")
     ax.set_ylabel("Count")
+
     success_rate = len(steps_success) / n_trajectories * 100
     ax.set_title(f"Steps distribution — success rate: {success_rate:.1f}%")
     ax.legend()
+
     return ax
