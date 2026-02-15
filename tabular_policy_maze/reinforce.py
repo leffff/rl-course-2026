@@ -24,6 +24,10 @@ def log_policy_gradient(state, action, theta):
     grad[state, action] += 1.0  # one-hot minus probs (softmax grad)
     return grad
 
+def policy_entropy(state, theta, eps=1e-8):
+    probs = softmax_policy(state, theta)
+    return -np.sum(probs * np.log(probs + 1e-8))
+
 def train_reinforce(env, n_iter=300, n_episodes=32, alpha=0.05, gamma=1.0):
     theta = np.zeros((env.n_states, env.n_actions))
     mean_returns = []
@@ -116,6 +120,164 @@ def train_reinforce_with_baseline(env, n_iter=300, n_episodes=32, alpha=0.05, ga
         pbar.set_postfix(mean_return=f"{mean_ret:.3f}")
 
     return theta, mean_returns
+
+
+def train_reinforce_with_advantage(
+    env, n_iter=300, n_episodes=32, alpha=0.05, gamma=1.0, alpha_v=0.01, adv_eps=1e-8
+):
+    theta = np.zeros((env.n_states, env.n_actions), dtype=np.float64)
+    V = np.zeros(env.n_states, dtype=np.float64)
+
+    mean_returns = []
+
+    pbar = tqdm(range(n_iter), desc="REINFORCE Iteration")
+    for _ in pbar:
+        returns = []
+        delta_V = np.zeros_like(V)
+        count_V = np.zeros_like(V)
+
+        batch_states = []
+        batch_actions = []
+        batch_advantages = []
+
+        for _ in range(n_episodes):
+            s = env.reset()
+
+            states, actions, rewards = [], [], []
+            done = False
+            while not done:
+                a = sample_action(s, theta)
+                s_next, r, done = env.step(a)
+
+                states.append(s)
+                actions.append(a)
+                rewards.append(r)
+
+                s = s_next
+
+            T = len(states)
+            G_t = np.zeros(T, dtype=np.float64)
+            G = 0.0
+            for t in reversed(range(T)):
+                G = rewards[t] + gamma * G
+                G_t[t] = G
+
+            returns.append(G_t[0])
+
+            for t in range(T):
+                s = states[t]
+                a = actions[t]
+                adv = G_t[t] - V[s]
+
+                batch_states.append(s)
+                batch_actions.append(a)
+                batch_advantages.append(adv)
+
+                delta_V[s] += adv
+                count_V[s] += 1.0
+
+        adv_arr = np.asarray(batch_advantages)
+        adv_mean = adv_arr.mean()
+        adv_std = adv_arr.std()
+        adv_norm = (adv_arr - adv_mean) / (adv_std + adv_eps)
+
+        grad_total = np.zeros_like(theta)
+        for s, a, adv_n in zip(batch_states, batch_actions, adv_norm):
+            grad_total += log_policy_gradient(s, a, theta) * adv_n
+
+        theta += alpha * grad_total / n_episodes
+
+        mask = count_V > 0
+        V[mask] += alpha_v * (delta_V[mask] / count_V[mask])
+
+        mean_ret = float(np.mean(returns))
+        mean_returns.append(mean_ret)
+        pbar.set_postfix(mean_return=f"{mean_ret:.3f}")
+
+    return theta, mean_returns
+
+
+def train_reinforce_with_advantage_entropy(
+    env,
+    n_iter=300,
+    n_episodes=32,
+    alpha=0.05,
+    gamma=1.0,
+    alpha_v=0.01,
+    entropy_beta=0.05,
+    adv_eps=1e-8
+):
+    theta = np.zeros((env.n_states, env.n_actions), dtype=np.float64)
+    V = np.zeros(env.n_states, dtype=np.float64)
+
+    mean_returns = []
+
+    pbar = tqdm(range(n_iter), desc="REINFORCE Iteration")
+    for _ in pbar:
+        returns = []
+        delta_V = np.zeros_like(V)
+        count_V = np.zeros_like(V)
+
+        batch_states = []
+        batch_actions = []
+        batch_advantages = []
+
+        for _ in range(n_episodes):
+            s = env.reset()
+
+            states, actions, rewards = [], [], []
+            done = False
+            while not done:
+                a = sample_action(s, theta)
+                s_next, r, done = env.step(a)
+
+                states.append(s)
+                actions.append(a)
+                rewards.append(r)
+
+                s = s_next
+
+            T = len(states)
+            G_t = np.zeros(T, dtype=np.float64)
+            G = 0.0
+            for t in reversed(range(T)):
+                G = rewards[t] + gamma * G
+                G_t[t] = G
+
+            returns.append(G_t[0])
+
+            for t in range(T):
+                s = states[t]
+                a = actions[t]
+                adv = G_t[t] - V[s]
+
+                batch_states.append(s)
+                batch_actions.append(a)
+                batch_advantages.append(adv)
+
+                delta_V[s] += adv
+                count_V[s] += 1.0
+
+        adv_arr = np.asarray(batch_advantages)
+        adv_mean = adv_arr.mean()
+        adv_std = adv_arr.std()
+        adv_norm = (adv_arr - adv_mean) / (adv_std + adv_eps)
+
+        grad_total = np.zeros_like(theta)
+        for s, a, adv_n in zip(batch_states, batch_actions, adv_norm):
+            grad_total += log_policy_gradient(s, a, theta) * adv_n + entropy_beta * policy_entropy(s, theta)
+
+        theta += alpha * grad_total / n_episodes
+
+        mask = count_V > 0
+        V[mask] += alpha_v * (delta_V[mask] / count_V[mask])
+
+        mean_ret = float(np.mean(returns))
+        mean_returns.append(mean_ret)
+        pbar.set_postfix(mean_return=f"{mean_ret:.3f}")
+
+    return theta, mean_returns
+
 
 
 def sample_trajectory(env, theta):
