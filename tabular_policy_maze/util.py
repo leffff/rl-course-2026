@@ -1,9 +1,67 @@
 from collections import deque
 import numpy as np
+import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 
-from tabular_policy_maze.maze_env import MazeEnv
-from tabular_policy_maze.reinforce import sample_action
+from tabular_policy_maze.maze_env import MazeEnv, plot_maze
+from tabular_policy_maze.reinforce import sample_action, sample_trajectory
+
+
+def plot_maze_with_trajectory(env, theta, title="Trajectory"):
+    ax = plot_maze(env)
+    positions, reached_goal = sample_trajectory(env, theta)
+
+    rows = [p[0] for p in positions]
+    cols = [p[1] for p in positions]
+
+    jitter = np.random.uniform(-0.2, 0.2, size=(len(rows), 2))
+    rows_j = np.array(rows, dtype=float) + jitter[:, 0]
+    cols_j = np.array(cols, dtype=float) + jitter[:, 1]
+
+    color = "b" if reached_goal else "r"
+    ax.plot(cols_j, rows_j, f"{color}-", linewidth=1.5, alpha=0.6)
+    ax.plot(cols_j[0], rows_j[0], "go", markersize=10, zorder=5)
+    ax.plot(cols_j[-1], rows_j[-1], "ro", markersize=10, zorder=5)
+
+    status = "reached goal" if reached_goal else "TRUNCATED"
+    ax.set_title(f"{title}  (steps: {len(positions) - 1}, {status})")
+    return ax
+
+def plot_steps_distribution(env, theta, n_trajectories=500, figsize=(10, 5)):
+    steps_success, steps_fail = [], []
+    for _ in tqdm(range(n_trajectories), desc="Sampling trajectories"):
+        s = env.reset()
+        done, t = False, 0
+        while not done:
+            a = sample_action(s, theta)
+            s, _, done = env.step(a)
+            t += 1
+        if env._agent_pos == env.goal:
+            steps_success.append(t)
+        else:
+            steps_fail.append(t)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    all_steps = steps_success + steps_fail
+    bins = range(min(all_steps), max(all_steps) + 2)
+
+    if steps_success:
+        ax.hist(steps_success, bins=bins, edgecolor="black", alpha=0.7,
+                color="steelblue", label=f"goal ({len(steps_success)})")
+    if steps_fail:
+        ax.hist(steps_fail, bins=bins, edgecolor="black", alpha=0.7,
+                color="salmon", label=f"truncated ({len(steps_fail)})")
+
+    ax.axvline(np.mean(all_steps), color="red", linestyle="--",
+               label=f"mean={np.mean(all_steps):.1f}")
+    ax.set_xlabel("Steps")
+    ax.set_ylabel("Count")
+    success_rate = len(steps_success) / n_trajectories * 100
+    ax.set_title(f"Steps distribution — success rate: {success_rate:.1f}%")
+    ax.legend()
+    return ax
+
 
 def _bfs_reachable(maze, start, goal):
     H, W = maze.shape
