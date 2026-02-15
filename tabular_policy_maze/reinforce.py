@@ -55,6 +55,69 @@ def train_reinforce(env, n_iter=300, n_episodes=32, alpha=0.05, gamma=1.0):
 
     return theta, mean_returns
 
+
+def train_reinforce_with_baseline(env, n_iter=300, n_episodes=32, alpha=0.05, gamma=1.0, alpha_v=0.01):
+    theta = np.zeros((env.n_states, env.n_actions))
+    V = np.zeros(env.n_states)
+
+    mean_returns = []
+
+    pbar = tqdm(range(n_iter), desc="REINFORCE Iteration")
+    for _ in pbar:
+        grad_total = np.zeros_like(theta)
+        delta_V = np.zeros_like(V)
+        count_V = np.zeros_like(V)
+        returns = []
+
+        for _ in range(n_episodes):
+            s = env.reset()
+
+            states = []
+            actions = []
+            rewards = []
+
+            done = False
+            while not done:
+                a = sample_action(s, theta)
+                s_next, r, done = env.step(a)
+                
+                states.append(s)
+                actions.append(a)
+                rewards.append(r)
+
+                s = s_next
+            
+            T = len(states)
+            G_t = np.zeros(T)
+            G = 0.0
+            for t in reversed(range(T)):
+                G = rewards[t] + gamma * G
+                G_t[t] = G
+            
+            returns.append(G_t[0])
+            
+            for t in range(T):
+                s = states[t]
+                a = actions[t]
+                advantage = G_t[t] - V[s]
+                
+                grad_total += log_policy_gradient(s, a, theta) * advantage
+
+                delta_V[s] += advantage
+                count_V[s] += 1
+
+        theta += alpha * grad_total / n_episodes
+
+        mask = count_V > 0
+        V[mask] += alpha_v * delta_V[mask] / count_V[mask]
+
+        mean_ret = float(np.mean(returns))
+        mean_returns.append(mean_ret)
+        pbar.set_postfix(mean_return=f"{mean_ret:.3f}")
+
+    return theta, mean_returns
+
+
 def sample_trajectory(env, theta):
     s = env.reset()
     positions = [env.state_to_pos(s)]
@@ -78,7 +141,7 @@ def plot_maze_with_trajectory(env, theta, title="Trajectory"):
     rows_j = np.array(rows, dtype=float) + jitter[:, 0]
     cols_j = np.array(cols, dtype=float) + jitter[:, 1]
 
-    color = "b" if reached_goal else "orange"
+    color = "b" if reached_goal else "r"
     ax.plot(cols_j, rows_j, f"{color}-", linewidth=1.5, alpha=0.6)
     ax.plot(cols_j[0], rows_j[0], "go", markersize=10, zorder=5)
     ax.plot(cols_j[-1], rows_j[-1], "ro", markersize=10, zorder=5)
