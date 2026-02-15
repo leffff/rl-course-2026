@@ -1,7 +1,9 @@
 from collections import deque
 import numpy as np
+from tqdm.auto import tqdm
 
 from tabular_policy_maze.maze_env import MazeEnv
+from tabular_policy_maze.reinforce import sample_action
 
 def _bfs_reachable(maze, start, goal):
     H, W = maze.shape
@@ -77,3 +79,81 @@ def build_maze_env(
                            goal_reward=goal_reward)
 
     raise RuntimeError("Could not generate a solvable maze after 1000 attempts")
+
+def evaluate_policy(env, theta, n_eval=200):
+    """Run n_eval episodes, return success rate and mean steps (goal-reaching only)."""
+    success, goal_steps = 0, []
+    for _ in range(n_eval):
+        s = env.reset()
+        done, t = False, 0
+        while not done:
+            a = sample_action(s, theta)
+            s, _, done = env.step(a)
+            t += 1
+        if env._agent_pos == env.goal:
+            success += 1
+            goal_steps.append(t)
+    rate = success / n_eval
+    mean_steps = np.mean(goal_steps) if goal_steps else float('inf')
+    return rate, mean_steps
+
+
+def benchmark(
+    train_method,
+    train_arguments,
+    maze_class,
+    maze_arguments,
+    n_seeds,
+    n_eval
+):
+    """
+    For each seed: generate maze → train REINFORCE → evaluate.
+    Returns dict with per-seed and aggregate results.
+    """
+    results = []
+
+    for seed in tqdm(range(n_seeds), desc="Seeds"):
+        env = build_maze_env(
+            maze_class,
+            **maze_arguments,
+            seed=seed
+            )
+        
+        theta, mean_returns = train_method(
+            env, **train_arguments
+        )
+        rate, mean_steps = evaluate_policy(env, theta, n_eval=n_eval)
+        results.append({
+            'seed': seed,
+            'n_states': env.n_states,
+            'success_rate': rate,
+            'mean_steps': mean_steps,
+            'final_return': mean_returns[-1],
+        })
+
+    rates = [r['success_rate'] for r in results]
+    steps = [r['mean_steps'] for r in results if r['mean_steps'] != float('inf')]
+
+    summary = {
+        'n_seeds': n_seeds,
+        'avg_success_rate': np.mean(rates),
+        'std_success_rate': np.std(rates),
+        'avg_steps': np.mean(steps) if steps else float('inf'),
+        'std_steps': np.std(steps) if steps else float('inf'),
+        'per_seed': results,
+    }
+
+    summary.update(**maze_arguments)
+    summary.update(**train_arguments)
+
+    print(f"\n{'='*50}")
+
+    size = maze_arguments['size']
+    obstacle_pct = maze_arguments['obstacle_pct']
+    if size:
+        print(f"Maze {size}x{size}, obstacles={obstacle_pct*100:.0f}%, seeds={n_seeds}")
+    print(f"Success rate: {summary['avg_success_rate']*100:.1f}% ± {summary['std_success_rate']*100:.1f}%")
+    print(f"Mean steps (goal only): {summary['avg_steps']:.1f} ± {summary['std_steps']:.1f}")
+    print(f"{'='*50}")
+
+    return summary
