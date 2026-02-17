@@ -1,0 +1,1 @@
+{"method_name": "reinforce_with_advantage_entropy", "args": {"n_iter": 100, "alpha": 1.0, "gamma": 1.0, "alpha_v": 0.05, "entropy_beta": 0.005}, "n_episodes_arr": [8, 32, 128, 512], "success_rate_arr": [0.9975, 1.0, 1.0, 1.0], "mean_steps_arr": [26.46632537688442, 23.7225, 23.407500000000002, 23.138749999999998]}

@@ -1,0 +1,1 @@
+{"method_name": "REINFORCE", "args": {"n_iter": 100, "alpha": 0.05, "gamma": 1.0}, "n_episodes_arr": [8, 32, 128, 512], "success_rate_arr": [0.0, 0.0, 0.00125, 0.5], "mean_steps_arr": [Infinity, Infinity, 55.0, 25.5275]}
