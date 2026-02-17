@@ -1,0 +1,1 @@
+{"method_name": "reinforce_with_advantage", "args": {"n_iter": 100, "alpha": 1.0, "gamma": 1.0, "alpha_v": 0.05}, "n_episodes_arr": [8, 32, 128, 512], "success_rate_arr": [0.2525, 1.0, 1.0, 1.0], "mean_steps_arr": [136.685, 23.1675, 23.118750000000002, 23.09625]}

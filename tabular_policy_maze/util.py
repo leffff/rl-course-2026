@@ -1,10 +1,18 @@
 from collections import deque
+from io import BytesIO
+
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
 
+import imageio
+
 from tabular_policy_maze.maze_env import MazeEnv, plot_maze
-from tabular_policy_maze.reinforce import sample_action, sample_trajectory
+from tabular_policy_maze.reinforce import (
+    sample_action,
+    sample_trajectory,
+    sample_trajectory_deterministic,
+)
 
 
 def plot_maze_with_trajectory(env, theta, title="Trajectory"):
@@ -215,3 +223,70 @@ def benchmark(
     print(f"{'='*50}")
 
     return summary
+
+
+def render_frame(env, position, path_so_far=None):
+    """
+    Render one frame: maze + optional path so far + agent at position.
+    position: (row, col). path_so_far: list of (row, col).
+    Returns RGB array (H, W, 3) uint8.
+    """
+    ax = plot_maze(env)
+    if path_so_far and len(path_so_far) >= 2:
+        cols = [p[1] for p in path_so_far]
+        rows = [p[0] for p in path_so_far]
+        ax.plot(cols, rows, "b-", linewidth=2, alpha=0.6)
+    r, c = position
+    ax.plot(c, r, "o", color="blue", markersize=14, zorder=5)
+    fig = ax.figure
+    buf = BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0.1)
+    plt.close(fig)
+    buf.seek(0)
+    img = imageio.imread(buf)
+    if img.ndim == 2:
+        img = np.stack([img] * 3, axis=-1)
+    elif img.shape[-1] == 4:
+        img = img[..., :3]
+    return img
+
+
+def frames_to_gif(frames, path, fps=4):
+    """Write list of RGB arrays (H, W, 3) uint8 to GIF at path."""
+    imageio.mimsave(path, frames, fps=fps, loop=0)
+
+
+def create_gif(
+    theta,
+    env,
+    output_path="maze_walk.gif",
+    *,
+    fps=4,
+    show_path=True,
+    deterministic=False,
+    last_frame_hold=5,
+):
+    """
+    Sample one trajectory, render frames, save GIF.
+
+    Returns (positions, reached_goal).
+    """
+
+    if deterministic:
+        positions, reached_goal = sample_trajectory_deterministic(env, theta)
+    else:
+        positions, reached_goal = sample_trajectory(env, theta)
+
+    if not positions:
+        raise RuntimeError("Trajectory is empty, cannot create GIF")
+
+    frames = []
+    for i, pos in enumerate(positions):
+        path_so_far = positions[: i + 1] if show_path else None
+        frames.append(render_frame(env, pos, path_so_far))
+
+    for _ in range(last_frame_hold):
+        frames.append(render_frame(env, positions[-1], positions if show_path else None))
+
+    frames_to_gif(frames, output_path, fps=fps)
+    return positions, reached_goal

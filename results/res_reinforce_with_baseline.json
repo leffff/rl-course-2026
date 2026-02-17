@@ -1,0 +1,1 @@
+{"method_name": "reinforce_with_baseline", "args": {"n_iter": 100, "alpha": 0.05, "gamma": 1.0, "alpha_v": 0.05}, "n_episodes_arr": [8, 32, 128, 512], "success_rate_arr": [0.0, 0.0, 0.5, 1.0], "mean_steps_arr": [Infinity, Infinity, 25.104999999999997, 27.7125]}

@@ -324,6 +324,8 @@ def train_reinforce_with_gae_entropy(
                 dones.append(done)
 
                 s = s_next
+            
+            returns.append(G)
 
             # --------- GAE advantages ----------
             T = len(states)
@@ -353,7 +355,6 @@ def train_reinforce_with_gae_entropy(
 
         grad_total = np.zeros_like(theta)
         for s, a, adv_n in zip(batch_states, batch_actions, adv_norm):
-            # NOTE: assumes policy_entropy(s, theta) returns gradient of entropy wrt theta at state s.
             grad_total += log_policy_gradient(s, a, theta) * adv_n + entropy_beta * policy_entropy_gradient(s, theta)
 
         theta += alpha * grad_total / n_episodes
@@ -372,6 +373,19 @@ def sample_trajectory(env, theta):
     done = False
     while not done:
         a = sample_action(s, theta)
+        s, _, done = env.step(a)
+        positions.append(env.state_to_pos(s))
+    reached_goal = (positions[-1] == env.goal)
+    return positions, reached_goal
+
+
+def sample_trajectory_deterministic(env, theta):
+    """Roll out with greedy (argmax) policy for reproducible trajectories."""
+    s = env.reset()
+    positions = [env.state_to_pos(s)]
+    done = False
+    while not done:
+        a = int(np.argmax(softmax_policy(s, theta)))
         s, _, done = env.step(a)
         positions.append(env.state_to_pos(s))
     reached_goal = (positions[-1] == env.goal)
