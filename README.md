@@ -24,7 +24,7 @@ cd rl-course-2026/
 pip install -r requirements.txt
 ```
 
-**Requirements:** `numpy`, `tqdm`, `matplotlib`, `torch`, `imageio`.
+**Requirements:** `numpy`, `tqdm`, `matplotlib`, `imageio`.
 
 ---
 
