@@ -155,7 +155,6 @@ rl-course-2026/
 ├── requirements.txt
 ├── exps.ipynb          # Main experiments and benchmarks
 ├── maze_tabular.ipynb  # Additional maze/tabular experiments
-├── res_*.json          # Saved benchmark results
 └── tabular_policy_maze/
     ├── maze_env.py     # MazeEnv, MazeEnvWithDistanceReward, plot_maze
     ├── reinforce.py    # Policy + all REINFORCE training variants
