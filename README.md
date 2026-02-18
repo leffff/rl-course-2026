@@ -94,6 +94,7 @@ positions, reached_goal = create_gif(
   - **Step:** −1 per non-terminal step (encourages shorter paths).
   - **Goal:** 0 on reaching the goal (episode terminates).
 - **Episode end:** Reaching the goal or hitting `max_steps` (truncation).
+- **Transition function:** Deterministic: agent moves in the direction of the selected action, if it is not wall. If wall: stays in the same state.
 
 Two environment variants:
 
@@ -128,8 +129,11 @@ In the report and notebooks we compare these variants (excluding GAE) in terms o
 
 ---
 
-
 ## Results
+
+### Reproducibility
+
+Hyperparameters for all reported experiments are stored in the `.json` files in the `results` folder.
 
 ### GIF: agent walking the maze
 
