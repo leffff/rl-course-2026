@@ -1,6 +1,4 @@
-# REINFORCE for Maze Navigation
-
-**How big of a maze can REINFORCE solve?**
+# How big of a maze can REINFORCE solve?
 
 This project explores hyperparameters and algorithm modifications for the REINFORCE policy-gradient method applied to shortest-path navigation in 2D mazes. The goal is to solve larger mazes, in fewer steps, with faster and more stable training.
 
@@ -13,6 +11,14 @@ We implement **tabular** (state–action) policies and compare:
 - Distance-dependent rewards  
 
 We evaluate all methods on **success rate** and **average path length** across different maze sizes. See the notebooks (`exps.ipynb`, `maze_tabular.ipynb`) for experiments and plots.
+
+## Clear Problem Definition
+
+The task is shortest-path navigation in a randomly generated 2D grid maze. The agent starts at the top-left corner and must reach the bottom-right corner while avoiding obstacles, in as few steps as possible.
+
+**Environment dynamics:** The agent occupies a single cell and chooses one of four cardinal directions each step. If the chosen move leads into a wall or outside the grid, the agent stays in place. The maze layout (obstacle positions, start, goal) is fixed for the duration of an episode.
+
+**Transitions are deterministic:** given a state and action, the next state is uniquely determined. Stochasticity arises only from the policy (action sampling) and from maze generation across different seeds.
 
 ---
 
