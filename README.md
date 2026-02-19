@@ -156,11 +156,11 @@ Parameters $\theta \in \mathbb{R}^{|S| \times |A|}$ are updated by policy gradie
 
 **Policy gradient (no baseline):**
 
-$$\nabla_\theta J \approx \frac{1}{N} \sum_{\text{episodes}} \sum_t \nabla_\theta \log \pi_\theta(a_t|s_t) \, G_t$$
+$$\nabla_\theta \hat{J} = \frac{1}{N} \sum_{\text{episodes}} \sum_t \nabla_\theta \log \pi_\theta(a_t|s_t) \, G_t$$
 
 **Update:**
 
-$$\theta \leftarrow \theta + \alpha \, \frac{1}{N} \sum_{\text{episodes}} \sum_t G_t \, \nabla_\theta \log \pi_\theta(a_t|s_t)$$
+$$\theta \leftarrow \theta + \alpha \frac{1}{N} \sum_{\text{episodes}} \sum_t G_t \nabla_\theta \log \pi_\theta(a_t|s_t)$$
 
 - For each episode we compute the full return $G$ from the start (or $G_t$ per step). We use the same $G$ for every $(s_t, a_t)$ in that episode (or $G_t$ for each $t$).
 - No value function. High variance; learning is slow and unstable on larger mazes.
@@ -173,7 +173,7 @@ We learn a state-value function $V(s)$ and use the **advantage** $A_t = G_t - V(
 
 **Policy gradient:**
 
-$$\nabla_\theta J \approx \frac{1}{N} \sum_{\text{episodes}} \sum_t \nabla_\theta \log \pi_\theta(a_t|s_t) \, (G_t - V(s_t))$$
+$$\nabla_\theta \hat{J} = \frac{1}{N} \sum_{\text{episodes}} \sum_t \nabla_\theta \log \pi_\theta(a_t|s_t) (G_t - V(s_t))$$
 
 **Updates:**
 
@@ -195,11 +195,11 @@ Same as REINFORCE with baseline, but we **normalize the advantages** over the ba
 
 **Policy gradient:**
 
-$$\nabla_\theta J \approx \frac{1}{N} \sum \nabla_\theta \log \pi_\theta(a_t|s_t) \, \tilde{A}_t$$
+$$\nabla_\theta \hat{J} = \frac{1}{N} \sum \nabla_\theta \log \pi_\theta(a_t|s_t) \tilde{A}_t$$
 
 **Updates:**
 
-- **Policy:** $\theta \leftarrow \theta + \alpha \, \frac{1}{N} \sum \tilde{A}_t \, \nabla_\theta \log \pi_\theta(a_t|s_t)$
+- **Policy:** $ \theta \leftarrow \theta + \alpha \frac{1}{N} \sum \tilde{A}_t \nabla_\theta \log \pi_\theta(a_t|s_t) $
 - **Value:** $V(s)$ updated as in REINFORCE with baseline (e.g. toward $G_t$ for visited states).
 
 Normalizing stabilizes the scale of the gradient and often improves performance compared to the raw baseline.
@@ -212,13 +212,13 @@ We combine **advantage normalization** (as above) with an **entropy bonus** to e
 
 **Policy gradient:**
 
-$$\nabla_\theta J \approx \frac{1}{N} \sum \Big[ \nabla_\theta \log \pi_\theta(a_t|s_t) \, \tilde{A}_t + \beta \, \nabla_\theta \mathcal{H}\big(\pi_\theta(\cdot|s_t)\big) \Big]$$
+$$\nabla_\theta \hat{J} = \frac{1}{N} \sum \Big[ \nabla_\theta \log \pi_\theta(a_t|s_t) \tilde{A}_t + \beta \nabla_\theta \mathcal{H}\big(\pi_\theta(\cdot|s_t)\big) \Big]$$
 
 where $\mathcal{H}(\pi) = -\sum_a \pi(a) \log \pi(a)$ is the entropy of the policy at $s_t$, and $\beta > 0$ is the entropy coefficient.
 
 **Update:**
 
-$$\theta \leftarrow \theta + \alpha \, \frac{1}{N} \sum \Big[ \tilde{A}_t \, \nabla_\theta \log \pi_\theta(a_t|s_t) + \beta \, \nabla_\theta \mathcal{H}\big(\pi_\theta(\cdot|s_t)\big) \Big]$$
+$$\theta \leftarrow \theta + \alpha \, \frac{1}{N} \sum \Big[ \tilde{A}_t \nabla_\theta \log \pi_\theta(a_t|s_t) + \beta \nabla_\theta \mathcal{H}\big(\pi_\theta(\cdot|s_t)\big) \Big]$$
 
 - $\tilde{A}_t$: normalized advantage as in the previous section.
 - $V(s)$ is updated as before (e.g. toward observed returns at $s$).
