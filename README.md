@@ -93,6 +93,8 @@ positions, reached_goal = create_gif(
 
 ## Environment
 
+### Informal description
+
 - **State space:** 2D grid of cells. Each cell is either **free (0)** or **obstacle (1)**. Only free cells are valid states; the agent cannot enter walls.
 - **Actions:** 4 discrete — up, down, left, right. Invalid moves (into wall or boundary) leave the agent in place.
 - **Start / goal:** Fixed at top-left and bottom-right free cells. Mazes are generated so a path between them exists (checked by BFS).
@@ -102,7 +104,32 @@ positions, reached_goal = create_gif(
 - **Episode end:** Reaching the goal or hitting `max_steps` (truncation).
 - **Transition function:** Deterministic: agent moves in the direction of the selected action, if it is not wall. If wall: stays in the same state.
 
-Two environment variants:
+### Formal definition (MDP)
+
+We define the maze as a finite-horizon Markov decision process.
+
+**Grid and layout.** Let the grid be $\mathcal{G} = \{0,\ldots,H-1\} \times \{0,\ldots,W-1\}$ with $H, W \in \mathbb{N}$. A **maze** is a function $M: \mathcal{G} \to \{0,1\}$ where $M(r,c)=0$ means free and $M(r,c)=1$ means obstacle. The set of **free cells** is $\mathcal{F} = \{(r,c) \in \mathcal{G} : M(r,c)=0\}$. We fix **start** $s_0 \in \mathcal{F}$ and **goal** $g \in \mathcal{F}$ (in the code: $s_0 = (0,0)$, $g = (H-1,W-1)$). Mazes are generated so that $g$ is reachable from $s_0$ via moves in $\mathcal{F}$ (checked by BFS).
+
+**State space.** The state space is $\mathcal{S} = \mathcal{F}$, with size $|\mathcal{S}|$ equal to the number of free cells. States are identified with cell positions $(r,c)$ (or with an index in $\{0,\ldots,|\mathcal{S}|-1\}$ in the implementation).
+
+**Action space.** $\mathcal{A} = \{0,1,2,3\}$ corresponding to **up**, **down**, **left**, **right** with displacement vectors $d_0=(-1,0)$, $d_1=(1,0)$, $d_2=(0,-1)$, $d_3=(0,1)$.
+
+**Transition.** Transitions are deterministic. From state $s = (r,c)$ and action $a$:
+- Let $(r',c') = (r,c) + d_a$. If $(r',c') \in \mathcal{G}$, $M(r',c')=0$, then the next state is $s' = (r',c')$; otherwise $s' = s$ (stay in place).
+
+**Reward and termination (MazeEnv).** Let $T_{\max}$ be the maximum step count per episode (e.g. 200). Step reward $r_{\text{step}} \in \mathbb{R}$ (e.g. $-1$) and goal reward $r_{\text{goal}} \in \mathbb{R}$ (e.g. $0$).
+
+- If $s' = g$: reward $r_{\text{goal}}$, episode **done**.
+- Else if the number of steps in the episode has reached $T_{\max}$: reward $r_{\text{step}}$, episode **done** (truncation).
+- Else: reward $r_{\text{step}}$, not done.
+
+**Reward and termination (MazeEnvWithDistanceReward).** Same transition and termination. Reward is distance-dependent: let $d(s) = |r - r_g| + |c - c_g|$ (Manhattan distance from $s$ to $g$) and $D = d(s_0)$. For non-goal, non-truncation steps the reward is $r_{\text{step}} \cdot d(s')/D$; at truncation the reward is $r_{\text{step}} \cdot d(s')/D$; at the goal the reward is $r_{\text{goal}}$. So the agent gets a less negative (or zero) signal when closer to the goal.
+
+**Initial state.** The initial state is always $s_0$. So we have a fixed start and an episodic task with horizon at most $T_{\max}$ and terminal events (goal or truncation).
+
+---
+
+Two environment variants (summary):
 
 | Class | Description |
 |-------|-------------|
@@ -113,25 +140,90 @@ Environments are built with `build_maze_env(maze_env_class, size, obstacle_pct=0
 
 ---
 
-## Methods
-We use a **tabular softmax policy** \(\pi_\theta(a|s) \propto \exp(\theta_{s,a})\) and optimize it with policy gradients. All variants follow the same structure: collect trajectories, compute (possibly modified) gradient contributions, update \(\theta\).
+## Algorithms
 
-1. **REINFORCE (vanilla)**  
-   Gradient estimate: \(\hat{g} = \sum_t \nabla \log \pi_\theta(a_t|s_t)\, G_t\), where \(G_t\) is the return from time \(t\). High variance; learning is slow and unstable on larger mazes.
+All methods use a **tabular softmax policy**:
 
-2. **REINFORCE with baseline**  
-   Same gradient form but we use \(G_t - V(s_t)\) instead of \(G_t\), where \(V(s)\) is a learned state-value function (updated by MC or similar). The baseline reduces variance without biasing the gradient, improving stability and convergence.
+$$\pi_\theta(a|s) = \frac{\exp(\theta_{s,a})}{\sum_{a'} \exp(\theta_{s,a'})}$$
 
-3. **Advantage normalization**  
-   We normalize the advantages \((G_t - V(s_t))\) over the batch (e.g. subtract mean, divide by std). This further stabilizes updates and often improves performance compared to the raw baseline.
+Parameters $\theta \in \mathbb{R}^{|S| \times |A|}$ are updated by policy gradient. Each iteration we collect $N$ episodes, then apply one gradient step.
 
-4. **Entropy regularization**  
-   We add a term that encourages exploration by penalizing low entropy of \(\pi_\theta(\cdot|s)\). This helps avoid early convergence to suboptimal policies and can improve success rate and path quality.
+**Notation:** $s_t$, $a_t$, $r_t$ = state, action, reward at step $t$. $G_t = \sum_{k \geq t} \gamma^{k-t} r_k$ = return from $t$. $\gamma$ = discount factor.
 
-5. **Distance-dependent reward**  
-   Used in `MazeEnvWithDistanceReward`: step reward depends on distance to goal. This provides a denser signal (getting closer is better), which accelerates training and helps the agent find the goal in larger mazes.
+---
 
-In the report and notebooks we compare these variants (excluding GAE) in terms of success rate and average number of steps to reach the goal.
+### 1. REINFORCE (vanilla)
+
+**Policy gradient (no baseline):**
+
+$$\nabla_\theta J \approx \frac{1}{N} \sum_{\text{episodes}} \sum_t \nabla_\theta \log \pi_\theta(a_t|s_t) \, G_t$$
+
+**Update:**
+
+$$\theta \leftarrow \theta + \alpha \, \frac{1}{N} \sum_{\text{episodes}} \sum_t G_t \, \nabla_\theta \log \pi_\theta(a_t|s_t)$$
+
+- For each episode we compute the full return $G$ from the start (or $G_t$ per step). We use the same $G$ for every $(s_t, a_t)$ in that episode (or $G_t$ for each $t$).
+- No value function. High variance; learning is slow and unstable on larger mazes.
+
+---
+
+### 2. REINFORCE with baseline
+
+We learn a state-value function $V(s)$ and use the **advantage** $A_t = G_t - V(s_t)$ in place of $G_t$.
+
+**Policy gradient:**
+
+$$\nabla_\theta J \approx \frac{1}{N} \sum_{\text{episodes}} \sum_t \nabla_\theta \log \pi_\theta(a_t|s_t) \, (G_t - V(s_t))$$
+
+**Updates:**
+
+- **Policy:** $\theta \leftarrow \theta + \alpha \, \frac{1}{N} \sum_{\text{episodes}} \sum_t (G_t - V(s_t)) \, \nabla_\theta \log \pi_\theta(a_t|s_t)$
+- **Value:** $V(s)$ is updated to match the returns observed at $s$ (e.g. running average of $G_t$ for visits to $s$, or a small step toward $G_t$).
+
+The baseline $V(s_t)$ reduces variance without biasing the gradient ($\mathbb{E}[V(s_t) \nabla \log \pi] = 0$), improving stability and convergence.
+
+---
+
+### 3. REINFORCE with advantage normalization
+
+Same as REINFORCE with baseline, but we **normalize the advantages** over the batch before the policy update.
+
+**Computation:**
+
+- Compute advantages $A_t = G_t - V(s_t)$ for all $(s_t, a_t)$ in the batch.
+- Normalize: $\tilde{A}_t = \frac{A_t - \mu_A}{\sigma_A + \epsilon}$, where $\mu_A$, $\sigma_A$ are the mean and standard deviation of the $A_t$ in the batch, and $\epsilon > 0$ is a small constant.
+
+**Policy gradient:**
+
+$$\nabla_\theta J \approx \frac{1}{N} \sum \nabla_\theta \log \pi_\theta(a_t|s_t) \, \tilde{A}_t$$
+
+**Updates:**
+
+- **Policy:** $\theta \leftarrow \theta + \alpha \, \frac{1}{N} \sum \tilde{A}_t \, \nabla_\theta \log \pi_\theta(a_t|s_t)$
+- **Value:** $V(s)$ updated as in REINFORCE with baseline (e.g. toward $G_t$ for visited states).
+
+Normalizing stabilizes the scale of the gradient and often improves performance compared to the raw baseline.
+
+---
+
+### 4. REINFORCE with advantage normalization and entropy regularization
+
+We combine **advantage normalization** (as above) with an **entropy bonus** to encourage exploration.
+
+**Policy gradient:**
+
+$$\nabla_\theta J \approx \frac{1}{N} \sum \Big[ \nabla_\theta \log \pi_\theta(a_t|s_t) \, \tilde{A}_t + \beta \, \nabla_\theta \mathcal{H}\big(\pi_\theta(\cdot|s_t)\big) \Big]$$
+
+where $\mathcal{H}(\pi) = -\sum_a \pi(a) \log \pi(a)$ is the entropy of the policy at $s_t$, and $\beta > 0$ is the entropy coefficient.
+
+**Update:**
+
+$$\theta \leftarrow \theta + \alpha \, \frac{1}{N} \sum \Big[ \tilde{A}_t \, \nabla_\theta \log \pi_\theta(a_t|s_t) + \beta \, \nabla_\theta \mathcal{H}\big(\pi_\theta(\cdot|s_t)\big) \Big]$$
+
+- $\tilde{A}_t$: normalized advantage as in the previous section.
+- $V(s)$ is updated as before (e.g. toward observed returns at $s$).
+
+The entropy term discourages the policy from becoming too deterministic too early, which helps avoid suboptimal policies and can improve success rate and path quality.
 
 ---
 
